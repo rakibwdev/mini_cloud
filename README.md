@@ -1,58 +1,135 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Mini Cloud Storage System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A backend system for a simulated cloud file storage service, built with Laravel. It supports file uploads with a 500MB storage limit per user, deduplication, file deletion, and storage summaries.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **User Storage Limit:** Each user has a fixed storage limit of 500 MB.
+- **File Upload:** Upload files with metadata (name, size, hash, upload time).
+- **Deduplication:** Optimized storage by storing unique file content only once (based on SHA-256 hash), while maintaining individual user references.
+- **Concurrency Handling:** Uses database transactions and row locking (`lockForUpdate`) to handle simultaneous uploads and prevent storage limit violations.
+- **File Management:** View storage summary, list uploaded files, and delete files.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Tech Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **Backend:** Laravel (PHP)
+- **Database:** MySQL
+- **Testing:** PHPUnit
 
-## Learning Laravel
+## Setup Instructions
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository_url>
+    cd mini_cloud
+    ```
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+2.  **Install Dependencies:**
+    ```bash
+    composer install
+    ```
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+3.  **Configure Environment:**
+    Copy `.env.example` to `.env` and configure your database settings:
+    ```bash
+    cp .env.example .env
+    ```
+    Update `.env` with your MySQL credentials:
+    ```env
+    DB_CONNECTION=mysql
+    DB_HOST=127.0.0.1
+    DB_PORT=3306
+    DB_DATABASE=mini_cloud
+    DB_USERNAME=root
+    DB_PASSWORD=your_password
+    ```
 
-## Agentic Development
+4.  **Generate Application Key:**
+    ```bash
+    php artisan key:generate
+    ```
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+5.  **Run Migrations:**
+    ```bash
+    php artisan migrate
+    ```
 
-```bash
-composer require laravel/boost --dev
+6.  **Serve the Application:**
+    ```bash
+    php artisan serve
+    ```
 
-php artisan boost:install
+## API Documentation
+
+### 1. Upload File
+**Endpoint:** `POST /api/users/{user_id}/files`
+**Description:** Uploads a file for a specific user.
+**Body:** `form-data` with key `file`.
+
+**Example Response:**
+```json
+{
+    "message": "File uploaded successfully",
+    "file": {
+        "id": 1,
+        "name": "document.pdf",
+        "size": 1048576,
+        "upload_time": "2023-10-27T10:00:00.000000Z"
+    }
+}
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### 2. Delete File
+**Endpoint:** `DELETE /api/users/{user_id}/files/{file_id}`
+**Description:** Deletes a specific file for a user and updates their storage usage.
 
-## Contributing
+**Example Response:**
+```json
+{
+    "message": "File deleted successfully"
+}
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 3. Get Storage Summary
+**Endpoint:** `GET /api/users/{user_id}/storage-summary`
+**Description:** Returns the user's storage usage details.
 
-## Code of Conduct
+**Example Response:**
+```json
+{
+    "total_storage_used": 1048576,
+    "remaining_storage": 523239424,
+    "total_active_files": 1
+}
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 4. List User Files
+**Endpoint:** `GET /api/users/{user_id}/files`
+**Description:** Lists all active files for a user.
 
-## Security Vulnerabilities
+**Example Response:**
+```json
+[
+    {
+        "id": 1,
+        "name": "document.pdf",
+        "size": 1048576,
+        "upload_time": "2023-10-27T10:00:00.000000Z"
+    }
+]
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Running Tests
 
-## License
+To run the automated tests:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+php artisan test
+```
+
+## Design Decisions
+
+- **Deduplication:** A `files` table stores physical file metadata (hash, size) uniquely. The `user_files` table links users to these files. This saves space when multiple users upload the same file.
+- **Concurrency:** `DB::transaction` ensures atomicity. `User::lockForUpdate()` prevents race conditions where two simultaneous uploads could exceed the storage limit by reading the same initial usage value.
+- **Storage Limit:** Enforced at the application level within the transaction before any database writes occur.
+
