@@ -16,7 +16,24 @@ A backend system for a simulated cloud file storage service, built with Laravel.
 - **Database:** MySQL
 - **Testing:** PHPUnit
 
-## Setup Instructions
+## Docker Setup (Recommended)
+
+To run the project easily using Docker:
+
+1.  **Ensure Docker and Docker Compose are installed.**
+2.  **Run the application stack:**
+    ```bash
+    docker-compose up -d --build
+    ```
+3.  **Setup the application inside the container:**
+    ```bash
+    docker-compose exec app php artisan key:generate
+    docker-compose exec app php artisan migrate
+    docker-compose exec app php artisan db:seed
+    ```
+4.  **Access the application:** Open `http://localhost:8000` in your browser.
+
+## Manual Setup Instructions
 
 1.  **Clone the repository:**
     ```bash
