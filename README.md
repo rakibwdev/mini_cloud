@@ -119,6 +119,10 @@ A backend system for a simulated cloud file storage service, built with Laravel.
 ]
 ```
 
+## Sample Requests
+
+For a list of ready-to-use `curl` commands to test the API, please refer to the [SAMPLE_REQUESTS.md](SAMPLE_REQUESTS.md) file.
+
 ## Running Tests
 
 To run the automated tests:
@@ -129,7 +133,30 @@ php artisan test
 
 ## Design Decisions
 
-- **Deduplication:** A `files` table stores physical file metadata (hash, size) uniquely. The `user_files` table links users to these files. This saves space when multiple users upload the same file.
-- **Concurrency:** `DB::transaction` ensures atomicity. `User::lockForUpdate()` prevents race conditions where two simultaneous uploads could exceed the storage limit by reading the same initial usage value.
-- **Storage Limit:** Enforced at the application level within the transaction before any database writes occur.
+- **Deduplication:** A `files` table stores physical file metadata (hash, size) uniquely. The `user_files` table links users to these files. This saves space when multiple users upload the same file (e.g., viral content).
+- **Concurrency Control:** 
+    - Critical for enforcing the 500MB limit accurately. 
+    - We use **Pessimistic Locking** (`User::lockForUpdate()`) within a database transaction.
+    - When a user uploads a file, their row is locked. Simultaneous uploads for the *same* user are serialized (queued), ensuring the `used_storage` check is always based on the latest committed data.
+    - This does not block *other* users, maintaining system throughput.
+- **File Storage:** As per requirements, we only store file metadata and calculate hashes from the uploaded temporary file. The physical file content is not persisted to disk to save space/complexity for this demo, but the architecture allows enabling it easily via Laravel's `Storage` facade.
+
+## Scaling Strategy (100K+ Users)
+
+If the system grows to 100,000 users, the following strategies would be applied:
+
+1.  **Database Optimization:**
+    - **Indexing:** Ensure `user_id` and `file_hash` are indexed (already handled by Foreign Keys).
+    - **Read Replicas:** The `GET /files` and `GET /summary` endpoints are read-heavy. We can route these to read-only database replicas to reduce load on the primary writer node.
+    - **Sharding:** If `user_files` grows into millions of rows, we can shard the database based on `user_id`.
+
+2.  **Storage Layer (If persisting files):**
+    - Local disk storage won't scale. We would switch to **Object Storage** (AWS S3, Google Cloud Storage).
+    - Metadata (DB) would store the S3 key/path instead of just the hash.
+
+3.  **Caching:**
+    - User storage summaries are calculated frequently. We can cache the `storage-summary` response in Redis, invalidating/updating it only when a file is uploaded or deleted.
+
+4.  **Load Balancing:**
+    - Deploy multiple instances of the Laravel application behind a Load Balancer (Nginx/HAProxy) to handle incoming HTTP traffic.
 
