@@ -27,7 +27,7 @@ class FileController extends Controller
         $hash = hash_file('sha256', $uploadedFile->path());
         $name = $uploadedFile->getClientOriginalName();
 
-        return DB::transaction(function () use ($user_id, $size, $hash, $name) {
+        return DB::transaction(function () use ($user_id, $size, $hash, $name, $uploadedFile) {
             $user = User::lockForUpdate()->findOrFail($user_id);
 
             // Check storage limit
@@ -41,10 +41,17 @@ class FileController extends Controller
             }
 
             // Deduplication: Check if physical file already exists
-            $file = File::firstOrCreate(
-                ['hash' => $hash],
-                ['size' => $size]
-            );
+            $file = File::where('hash', $hash)->first();
+
+            if (!$file) {
+                // Save physical file
+                $path = $uploadedFile->storeAs('uploads', $hash, 'local');
+                
+                $file = File::create([
+                    'hash' => $hash,
+                    'size' => $size,
+                ]);
+            }
 
             // Create user file record
             $userFile = UserFile::create([

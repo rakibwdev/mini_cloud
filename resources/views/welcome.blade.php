@@ -201,7 +201,7 @@
                 const data = await response.json();
                 
                 if (!response.ok) {
-                    alert(data.error || 'Upload failed');
+                    alert(data.error || data.message || 'Upload failed');
                 } else {
                     await refreshData();
                 }
