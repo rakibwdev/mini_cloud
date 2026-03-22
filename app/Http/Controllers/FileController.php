@@ -7,16 +7,16 @@ use App\Models\User;
 use App\Models\UserFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Auth;
 
 class FileController extends Controller
 {
     const STORAGE_LIMIT = 524288000; // 500 MB in bytes
 
     /**
-     * Upload a file for a user.
+     * Upload a file for the authenticated user.
      */
-    public function upload(Request $request, $user_id)
+    public function upload(Request $request)
     {
         $request->validate([
             'file' => 'required|file',
@@ -27,8 +27,10 @@ class FileController extends Controller
         $hash = hash_file('sha256', $uploadedFile->path());
         $name = $uploadedFile->getClientOriginalName();
 
-        return DB::transaction(function () use ($user_id, $size, $hash, $name, $uploadedFile) {
-            $user = User::lockForUpdate()->findOrFail($user_id);
+        return DB::transaction(function () use ($size, $hash, $name, $uploadedFile) {
+            /** @var User $user */
+            $user = Auth::user();
+            $user = User::lockForUpdate()->find($user->id);
 
             // Check storage limit
             if ($user->used_storage + $size > self::STORAGE_LIMIT) {
@@ -36,7 +38,7 @@ class FileController extends Controller
             }
 
             // Check for duplicate filename for this user
-            if (UserFile::where('user_id', $user_id)->where('name', $name)->exists()) {
+            if (UserFile::where('user_id', $user->id)->where('name', $name)->exists()) {
                 return response()->json(['error' => 'File with this name already exists'], 422);
             }
 
@@ -44,8 +46,7 @@ class FileController extends Controller
             $file = File::where('hash', $hash)->first();
 
             if (!$file) {
-                // Save physical file
-                $path = $uploadedFile->storeAs('uploads', $hash, 'local');
+                $uploadedFile->storeAs('uploads', $hash, 'local');
                 
                 $file = File::create([
                     'hash' => $hash,
@@ -55,7 +56,7 @@ class FileController extends Controller
 
             // Create user file record
             $userFile = UserFile::create([
-                'user_id' => $user_id,
+                'user_id' => $user->id,
                 'file_id' => $file->id,
                 'name' => $name,
             ]);
@@ -76,14 +77,16 @@ class FileController extends Controller
     }
 
     /**
-     * Delete a file for a user.
+     * Delete a file for the authenticated user.
      */
-    public function delete($user_id, $file_id)
+    public function delete($file_id)
     {
-        return DB::transaction(function () use ($user_id, $file_id) {
-            $user = User::lockForUpdate()->findOrFail($user_id);
+        return DB::transaction(function () use ($file_id) {
+            /** @var User $user */
+            $user = Auth::user();
+            $user = User::lockForUpdate()->find($user->id);
             
-            $userFile = UserFile::where('user_id', $user_id)
+            $userFile = UserFile::where('user_id', $user->id)
                 ->where('id', $file_id)
                 ->with('file')
                 ->first();
@@ -105,12 +108,13 @@ class FileController extends Controller
     }
 
     /**
-     * Get storage summary for a user.
+     * Get storage summary for the authenticated user.
      */
-    public function summary($user_id)
+    public function summary()
     {
-        $user = User::findOrFail($user_id);
-        $fileCount = UserFile::where('user_id', $user_id)->count();
+        /** @var User $user */
+        $user = Auth::user();
+        $fileCount = UserFile::where('user_id', $user->id)->count();
 
         return response()->json([
             'total_storage_used' => $user->used_storage,
@@ -120,11 +124,14 @@ class FileController extends Controller
     }
 
     /**
-     * List all files for a user.
+     * List all files for the authenticated user.
      */
-    public function list($user_id)
+    public function list()
     {
-        $files = UserFile::where('user_id', $user_id)
+        /** @var User $user */
+        $user = Auth::user();
+        
+        $files = UserFile::where('user_id', $user->id)
             ->with('file')
             ->get()
             ->map(function ($userFile) {
