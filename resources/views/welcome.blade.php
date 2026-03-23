@@ -151,7 +151,7 @@
             const data = Object.fromEntries(formData.entries());
 
             try {
-                const response = await fetch(`/api/${type}`, {
+                const response = await fetch(`/web/${type}`, {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -173,7 +173,7 @@
 
         async function logout() {
             try {
-                const response = await fetch('/api/logout', { 
+                const response = await fetch('/web/logout', { 
                     method: 'POST',
                     headers: { 'Accept': 'application/json' }
                 });
