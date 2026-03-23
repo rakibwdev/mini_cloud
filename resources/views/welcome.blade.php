@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Cloud Storage System</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -139,6 +140,12 @@
 
     <script>
         const STORAGE_LIMIT = 524288000;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        const headers = {
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json'
+        };
 
         function showAuth(type) {
             document.getElementById('login-form').classList.toggle('hidden', type !== 'login');
@@ -151,12 +158,9 @@
             const data = Object.fromEntries(formData.entries());
 
             try {
-                const response = await fetch(`/web/${type}`, {
+                const response = await fetch(`/api/${type}`, {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
+                    headers: { ...headers, 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
 
@@ -167,15 +171,15 @@
                     alert(result.message || 'Authentication failed');
                 }
             } catch (e) {
-                alert('An error occurred.');
+                alert('An error occurred during authentication.');
             }
         }
 
         async function logout() {
             try {
-                const response = await fetch('/web/logout', { 
+                const response = await fetch('/api/logout', { 
                     method: 'POST',
-                    headers: { 'Accept': 'application/json' }
+                    headers: headers
                 });
                 if (response.ok) location.reload();
             } catch (e) {
@@ -184,7 +188,6 @@
         }
 
         @auth
-        // Initialization for authenticated users
         window.addEventListener('DOMContentLoaded', () => {
             refreshData();
         });
@@ -194,7 +197,7 @@
         }
 
         async function updateSummary() {
-            const response = await fetch('/api/storage-summary');
+            const response = await fetch('/api/storage-summary', { headers });
             if (!response.ok) return;
             const data = await response.json();
             
@@ -212,7 +215,7 @@
         }
 
         async function loadFiles() {
-            const response = await fetch('/api/files');
+            const response = await fetch('/api/files', { headers });
             if (!response.ok) return;
             const files = await response.json();
             
@@ -252,7 +255,7 @@
             try {
                 const response = await fetch('/api/files', {
                     method: 'POST',
-                    headers: { 'Accept': 'application/json' },
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
                     body: formData
                 });
 
@@ -275,7 +278,7 @@
             try {
                 const response = await fetch(`/api/files/${fileId}`, {
                     method: 'DELETE',
-                    headers: { 'Accept': 'application/json' }
+                    headers: headers
                 });
 
                 if (response.ok) {
